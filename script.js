@@ -1,5 +1,8 @@
 const STORAGE_KEY = 'personal-blog-content';
-const CONTENT_URL = 'blog-content.md';
+const CONTENT_URLS = [
+  'https://raw.githubusercontent.com/EfeKaner/personal-blog/main/blog-content.md',
+  new URL('blog-content.md', window.location.href).href
+];
 const passwordConfig = window.__BLOG_CONFIG__?.password;
 const PASSWORD = typeof passwordConfig === 'string' && passwordConfig.trim() ? passwordConfig.trim() : 'quietcorner2026!';
 const defaultTitle = 'Welcome to my quiet corner of the web';
@@ -101,21 +104,23 @@ function parseContentText(text) {
 }
 
 async function loadContentFromSource() {
-  try {
-    const response = await fetch(CONTENT_URL, { cache: 'no-store' });
+  for (const url of CONTENT_URLS) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
 
-    if (!response.ok) {
-      throw new Error(`Unable to load ${CONTENT_URL}: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Unable to load ${url}: ${response.status}`);
+      }
+
+      const parsedState = parseContentText(await response.text());
+
+      if (parsedState) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedState));
+        return parsedState;
+      }
+    } catch (error) {
+      console.warn(`Could not load blog content from ${url}:`, error);
     }
-
-    const parsedState = parseContentText(await response.text());
-
-    if (parsedState) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedState));
-      return parsedState;
-    }
-  } catch (error) {
-    console.warn('Could not load blog content from the shared markdown file, falling back to browser storage:', error);
   }
 
   return getStoredState();
