@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'personal-blog-content';
+const CONTENT_URL = 'blog-content.md';
 const passwordConfig = window.__BLOG_CONFIG__?.password;
 const PASSWORD = typeof passwordConfig === 'string' && passwordConfig.trim() ? passwordConfig.trim() : 'quietcorner2026!';
 const defaultTitle = 'Welcome to my quiet corner of the web';
@@ -64,6 +65,62 @@ function getStoredState() {
   };
 }
 
+function parseContentText(text) {
+  const trimmedText = text.trim();
+
+  if (!trimmedText) {
+    return null;
+  }
+
+  let title = defaultTitle;
+  let subtitle = defaultSubtitle;
+  let content = trimmedText;
+
+  const frontmatterMatch = trimmedText.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
+
+  if (frontmatterMatch) {
+    const frontmatter = frontmatterMatch[1];
+    const body = frontmatterMatch[2].trim();
+    const titleMatch = frontmatter.match(/^title:\s*(.+)$/m);
+    const subtitleMatch = frontmatter.match(/^subtitle:\s*(.+)$/m);
+
+    if (titleMatch) {
+      title = titleMatch[1].trim();
+    }
+
+    if (subtitleMatch) {
+      subtitle = subtitleMatch[1].trim();
+    }
+
+    if (body) {
+      content = body;
+    }
+  }
+
+  return { title, subtitle, content };
+}
+
+async function loadContentFromSource() {
+  try {
+    const response = await fetch(CONTENT_URL, { cache: 'no-store' });
+
+    if (!response.ok) {
+      throw new Error(`Unable to load ${CONTENT_URL}: ${response.status}`);
+    }
+
+    const parsedState = parseContentText(await response.text());
+
+    if (parsedState) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedState));
+      return parsedState;
+    }
+  } catch (error) {
+    console.warn('Could not load blog content from the shared markdown file, falling back to browser storage:', error);
+  }
+
+  return getStoredState();
+}
+
 function renderContent(state) {
   const currentState = state || getStoredState();
   blogTitle.textContent = currentState.title;
@@ -86,8 +143,8 @@ function renderContent(state) {
   blogContent.innerHTML = paragraphs;
 }
 
-function loadContent() {
-  const state = getStoredState();
+async function loadContent() {
+  const state = await loadContentFromSource();
   titleInput.value = state.title;
   subtitleInput.value = state.subtitle;
   editorText.value = state.content;
@@ -164,4 +221,6 @@ toolbarButtons.forEach((button) => {
   button.addEventListener('click', () => insertMarkdownTag(button.dataset.insert));
 });
 
-window.addEventListener('DOMContentLoaded', loadContent);
+window.addEventListener('DOMContentLoaded', () => {
+  loadContent();
+});

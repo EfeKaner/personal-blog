@@ -21,4 +21,4 @@ Bu değer workflow sırasında otomatik olarak [config.js](config.js) dosyasına
 Varsayılan yerel şifre: quietcorner2026!
 
 ## Not
-Yazılar tarayıcıda localStorage üzerinde saklanır. Böylece veritabanı gerekmeden çalışır ve isterseniz içerik .md dosyası olarak indirilebilir.
+Blog içeriği artık [blog-content.md](blog-content.md) dosyasından okunur. Bu sayede içerik değiştiğinde GitHub Pages üzerinden yayınlanan herkes yeni metni görür; değişiklikleri yayınlamak için dosyayı güncelleyip deploy etmek yeterlidir.
