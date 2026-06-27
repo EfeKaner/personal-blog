@@ -152,3 +152,8 @@ button.primary {
   background: #1f2937;
   color: #fffdf9;
 }
+
+button.secondary {
+  background: #f4e8dc;
+  color: #4b3524;
+}

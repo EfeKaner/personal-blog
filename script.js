@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'personal-blog-content';
-const PASSWORD = 'efeefe11134yutiw..';
-const CONTENT_FILE = 'blog-content.md';
+const passwordConfig = window.__BLOG_CONFIG__?.password;
+const PASSWORD = typeof passwordConfig === 'string' && passwordConfig.trim() ? passwordConfig.trim() : 'dev-password';
 const defaultContent = [
   'This is your personal blog space. You can edit the text from the button in the bottom-right corner.',
   'The panel is password-protected, so only you can update the content.',
@@ -12,6 +12,7 @@ const editButton = document.getElementById('editButton');
 const editorPanel = document.getElementById('editorPanel');
 const editorText = document.getElementById('editorText');
 const saveButton = document.getElementById('saveButton');
+const downloadButton = document.getElementById('downloadButton');
 const cancelButton = document.getElementById('cancelButton');
 
 function escapeHtml(value) {
@@ -39,20 +40,17 @@ function loadContent() {
   renderContent(text);
 }
 
-async function saveContentToFile(text) {
-  try {
-    const response = await fetch(CONTENT_FILE, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
-      body: text
-    });
+function downloadContentFile(text) {
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
 
-    if (!response.ok) {
-      console.warn('Could not save content to file:', response.status);
-    }
-  } catch (error) {
-    console.warn('File save failed:', error);
-  }
+  link.href = url;
+  link.download = 'blog-content.md';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 editButton.addEventListener('click', () => {
@@ -70,12 +68,16 @@ editButton.addEventListener('click', () => {
   }
 });
 
-saveButton.addEventListener('click', async () => {
+saveButton.addEventListener('click', () => {
   const text = editorText.value.trim() || defaultContent;
   localStorage.setItem(STORAGE_KEY, text);
-  await saveContentToFile(text);
   renderContent(text);
   editorPanel.classList.add('hidden');
+});
+
+downloadButton.addEventListener('click', () => {
+  const text = editorText.value.trim() || defaultContent;
+  downloadContentFile(text);
 });
 
 cancelButton.addEventListener('click', () => {
