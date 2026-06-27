@@ -1,10 +1,10 @@
 ---
-title: Welcome to my quiet corner of the web
-subtitle: By Efe · Updated recently
+title: Test Blog Update
+subtitle: By Efe · Updated for everyone
 ---
 
-This is your personal blog space. You can edit the text from the button in the bottom-right corner.
+This is a test update for everyone.
 
-The panel is password-protected, so only you can update the content.
+The blog content is now shared publicly.
 
-Feel free to replace this with your own stories, notes, or ideas.
+If you can see this message, the change is working.
