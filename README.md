@@ -18,5 +18,7 @@ Blog düzenleme şifresi deploy sırasında bir ortam değişkeninden gelir.
 
 Bu değer workflow sırasında otomatik olarak [config.js](config.js) dosyasına yazılır.
 
+Varsayılan yerel şifre: quietcorner2026!
+
 ## Not
 Yazılar tarayıcıda localStorage üzerinde saklanır. Böylece veritabanı gerekmeden çalışır ve isterseniz içerik .md dosyası olarak indirilebilir.

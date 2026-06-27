@@ -25,8 +25,31 @@
 
     <div id="editorPanel" class="editor-panel hidden" role="dialog" aria-modal="true" aria-label="Blog editor">
       <div class="editor-card">
-        <h2>Edit your blog</h2>
-        <p>Use the password you set to open this panel.</p>
+        <div class="editor-card__header">
+          <div>
+            <p class="editor-badge">Editing Studio</p>
+            <h2>Edit your blog</h2>
+          </div>
+          <p class="editor-hint">Add a beautiful title, a soft subtitle, and stylish section breaks in seconds.</p>
+        </div>
+
+        <div class="editor-meta">
+          <label class="editor-field">
+            <span>Başlık</span>
+            <input id="titleInput" class="editor-input" type="text" placeholder="Ana başlık" />
+          </label>
+          <label class="editor-field">
+            <span>Yan başlık</span>
+            <input id="subtitleInput" class="editor-input" type="text" placeholder="Kısa ifade" />
+          </label>
+        </div>
+
+        <div class="editor-toolbar">
+          <button type="button" class="chip-button" data-insert="## ">Alt başlık</button>
+          <button type="button" class="chip-button" data-insert="### ">Mini başlık</button>
+        </div>
+
+        <label class="editor-area-label" for="editorText">Blog metni</label>
         <textarea id="editorText" spellcheck="false"></textarea>
         <div class="editor-actions">
           <button id="downloadButton" class="secondary" type="button">Download .md</button>
