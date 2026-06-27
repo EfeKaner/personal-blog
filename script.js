@@ -4,7 +4,11 @@ const CONTENT_URLS = [
   new URL('blog-content.md', window.location.href).href
 ];
 const passwordConfig = window.__BLOG_CONFIG__?.password;
+const githubTokenConfig = window.__BLOG_CONFIG__?.githubToken;
+const repoConfig = window.__BLOG_CONFIG__?.repo;
 const PASSWORD = typeof passwordConfig === 'string' && passwordConfig.trim() ? passwordConfig.trim() : 'quietcorner2026!';
+const GITHUB_TOKEN = typeof githubTokenConfig === 'string' ? githubTokenConfig.trim() : '';
+const REPOSITORY = typeof repoConfig === 'string' && repoConfig.trim() ? repoConfig.trim() : 'EfeKaner/personal-blog';
 const defaultTitle = 'Welcome to my quiet corner of the web';
 const defaultSubtitle = 'By Efe · Updated recently';
 const defaultContent = [
@@ -126,6 +130,64 @@ async function loadContentFromSource() {
   return getStoredState();
 }
 
+function buildMarkdownContent(state) {
+  const title = (state.title || defaultTitle).replace(/\n/g, ' ');
+  const subtitle = (state.subtitle || defaultSubtitle).replace(/\n/g, ' ');
+  const content = (state.content || defaultContent).trim();
+
+  return `---\ntitle: ${title}\nsubtitle: ${subtitle}\n---\n\n${content}\n`;
+}
+
+function toBase64(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary);
+}
+
+async function saveContentToRemote(state) {
+  if (!GITHUB_TOKEN || !REPOSITORY) {
+    return false;
+  }
+
+  const endpoint = `https://api.github.com/repos/${REPOSITORY}/contents/blog-content.md`;
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+    'Content-Type': 'application/json'
+  };
+
+  const getResponse = await fetch(endpoint, { headers });
+
+  if (!getResponse.ok) {
+    throw new Error(`Unable to read blog file from GitHub: ${getResponse.status}`);
+  }
+
+  const fileData = await getResponse.json();
+  const markdownContent = buildMarkdownContent(state);
+  const putResponse = await fetch(endpoint, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({
+      message: 'Update blog content',
+      content: toBase64(markdownContent),
+      sha: fileData.sha
+    })
+  });
+
+  if (!putResponse.ok) {
+    const errorText = await putResponse.text();
+    throw new Error(`Unable to save blog file to GitHub: ${putResponse.status} ${errorText}`);
+  }
+
+  return true;
+}
+
 function renderContent(state) {
   const currentState = state || getStoredState();
   blogTitle.textContent = currentState.title;
@@ -201,16 +263,31 @@ editButton.addEventListener('click', () => {
   }
 });
 
-saveButton.addEventListener('click', () => {
+saveButton.addEventListener('click', async () => {
   const state = {
     title: titleInput.value.trim() || defaultTitle,
     subtitle: subtitleInput.value.trim() || defaultSubtitle,
     content: editorText.value.trim() || defaultContent
   };
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  renderContent(state);
-  editorPanel.classList.add('hidden');
+  try {
+    const remoteSaved = await saveContentToRemote(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    renderContent(state);
+    editorPanel.classList.add('hidden');
+
+    if (remoteSaved) {
+      window.alert('Blog saved successfully to the shared content file.');
+    } else {
+      window.alert('Blog saved locally. Add a GitHub token to sync it to the repository.');
+    }
+  } catch (error) {
+    console.error('Could not save the blog remotely:', error);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    renderContent(state);
+    editorPanel.classList.add('hidden');
+    window.alert('Blog saved locally, but the remote sync failed.');
+  }
 });
 
 downloadButton.addEventListener('click', () => {

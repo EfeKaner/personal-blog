@@ -17,13 +17,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create config.js from secret
+      - name: Create config.js from secrets
+        env:
+          BLOG_PASSWORD: ${{ secrets.BLOG_PASSWORD }}
+          BLOG_GITHUB_TOKEN: ${{ secrets.BLOG_GITHUB_TOKEN }}
         run: |
-          cat > config.js <<EOF
-          window.__BLOG_CONFIG__ = {
-            password: '${{ secrets.BLOG_PASSWORD }}'
-          };
-          EOF
+          python - <<'PY'
+          import json
+          import os
+
+          config = {
+            'password': os.environ.get('BLOG_PASSWORD', 'quietcorner2026!'),
+            'githubToken': os.environ.get('BLOG_GITHUB_TOKEN', ''),
+            'repo': 'EfeKaner/personal-blog'
+          }
+
+          with open('config.js', 'w', encoding='utf-8') as handle:
+            handle.write('window.__BLOG_CONFIG__ = ' + json.dumps(config, ensure_ascii=False) + ';\n')
+          PY
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

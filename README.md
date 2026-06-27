@@ -15,8 +15,10 @@ Blog düzenleme şifresi deploy sırasında bir ortam değişkeninden gelir.
 - GitHub Pages / GitHub Actions ile deploy ederken: repo ayarlarında bir secret oluşturun.
   - Ad: BLOG_PASSWORD
   - Değer: istediğiniz şifre
+  - Ad: BLOG_GITHUB_TOKEN
+  - Değer: blog içeriğini GitHub depoya yazabilen bir kişisel erişim token'ı
 
-Bu değer workflow sırasında otomatik olarak [config.js](config.js) dosyasına yazılır.
+Bu değerler workflow sırasında otomatik olarak [config.js](config.js) dosyasına yazılır.
 
 Varsayılan yerel şifre: quietcorner2026!
 
