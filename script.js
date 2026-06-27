@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'personal-blog-content';
 const PASSWORD = 'efeefe11134yutiw..';
+const CONTENT_FILE = 'blog-content.md';
 const defaultContent = [
   'This is your personal blog space. You can edit the text from the button in the bottom-right corner.',
   'The panel is password-protected, so only you can update the content.',
@@ -38,6 +39,22 @@ function loadContent() {
   renderContent(text);
 }
 
+async function saveContentToFile(text) {
+  try {
+    const response = await fetch(CONTENT_FILE, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
+      body: text
+    });
+
+    if (!response.ok) {
+      console.warn('Could not save content to file:', response.status);
+    }
+  } catch (error) {
+    console.warn('File save failed:', error);
+  }
+}
+
 editButton.addEventListener('click', () => {
   const enteredPassword = window.prompt('Enter password to edit the blog');
 
@@ -53,9 +70,10 @@ editButton.addEventListener('click', () => {
   }
 });
 
-saveButton.addEventListener('click', () => {
+saveButton.addEventListener('click', async () => {
   const text = editorText.value.trim() || defaultContent;
   localStorage.setItem(STORAGE_KEY, text);
+  await saveContentToFile(text);
   renderContent(text);
   editorPanel.classList.add('hidden');
 });
