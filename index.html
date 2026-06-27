@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Personal Blog</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="blog-card">
+        <p class="eyebrow">Personal Notes</p>
+        <h1>Welcome to my quiet corner of the web</h1>
+        <div id="blogContent" class="blog-content"></div>
+      </section>
+    </main>
+
+    <button id="editButton" class="edit-fab" type="button">Edit Blog</button>
+
+    <div id="editorPanel" class="editor-panel hidden" role="dialog" aria-modal="true" aria-label="Blog editor">
+      <div class="editor-card">
+        <h2>Edit your blog</h2>
+        <p>Use the password you set to open this panel.</p>
+        <textarea id="editorText" spellcheck="false"></textarea>
+        <div class="editor-actions">
+          <button id="saveButton" class="primary" type="button">Save</button>
+          <button id="cancelButton" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
