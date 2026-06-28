@@ -4,11 +4,7 @@ const CONTENT_URLS = [
   new URL('blog-content.md', window.location.href).href
 ];
 const passwordConfig = window.__BLOG_CONFIG__?.password;
-const githubTokenConfig = window.__BLOG_CONFIG__?.githubToken;
-const repoConfig = window.__BLOG_CONFIG__?.repo;
 const PASSWORD = typeof passwordConfig === 'string' && passwordConfig.trim() ? passwordConfig.trim() : 'quietcorner2026!';
-const GITHUB_TOKEN = typeof githubTokenConfig === 'string' ? githubTokenConfig.trim() : '';
-const REPOSITORY = typeof repoConfig === 'string' && repoConfig.trim() ? repoConfig.trim() : 'EfeKaner/personal-blog';
 const defaultTitle = 'Welcome to my quiet corner of the web';
 const defaultSubtitle = 'By Efe · Updated recently';
 const defaultContent = [
@@ -36,6 +32,11 @@ const blogTitle = document.querySelector('.blog-title');
 const blogMeta = document.querySelector('.blog-meta');
 const toolbarButtons = document.querySelectorAll('.chip-button');
 
+let socket = null;
+let syncTimer = null;
+let isSocketReady = false;
+const SYNC_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}/ws`;
+
 function escapeHtml(value) {
   return value
     .replace(/&/g, '&amp;')
@@ -43,6 +44,16 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function normalizeState(state) {
+  const baseState = state && typeof state === 'object' ? state : {};
+
+  return {
+    title: (baseState.title || defaultTitle).toString().trim() || defaultTitle,
+    subtitle: (baseState.subtitle || defaultSubtitle).toString().trim() || defaultSubtitle,
+    content: (baseState.content || defaultContent).toString().trim() || defaultContent
+  };
 }
 
 function getStoredState() {
@@ -55,21 +66,17 @@ function getStoredState() {
   try {
     const parsed = JSON.parse(saved);
     if (parsed && typeof parsed === 'object') {
-      return {
-        title: parsed.title || defaultTitle,
-        subtitle: parsed.subtitle || defaultSubtitle,
-        content: parsed.content || defaultContent
-      };
+      return normalizeState(parsed);
     }
   } catch (error) {
     console.warn('Could not parse saved blog state:', error);
   }
 
-  return {
-    title: defaultTitle,
-    subtitle: defaultSubtitle,
-    content: saved || defaultContent
-  };
+  return normalizeState({ content: saved });
+}
+
+function writeStoredState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeState(state)));
 }
 
 function parseContentText(text) {
@@ -107,62 +114,84 @@ function parseContentText(text) {
   return { title, subtitle, content };
 }
 
-function encodeStateForUrl(state) {
-  const json = JSON.stringify(state);
-  return encodeURIComponent(toBase64(json));
+function collectEditorState() {
+  return normalizeState({
+    title: titleInput.value,
+    subtitle: subtitleInput.value,
+    content: editorText.value
+  });
 }
 
-function decodeStateFromUrl() {
-  const hash = window.location.hash.replace(/^#/, '');
-  const stateMatch = hash.match(/^blog=(.+)$/);
+function applyState(state, options = {}) {
+  const nextState = normalizeState(state);
+  writeStoredState(nextState);
+  renderContent(nextState);
 
-  if (!stateMatch) {
-    return null;
+  if (!options.silent) {
+    titleInput.value = nextState.title;
+    subtitleInput.value = nextState.subtitle;
+    editorText.value = nextState.content;
   }
 
-  try {
-    const decoded = fromBase64(decodeURIComponent(stateMatch[1]));
-    const parsed = JSON.parse(decoded);
+  return nextState;
+}
 
-    if (parsed && typeof parsed === 'object') {
-      return {
-        title: parsed.title || defaultTitle,
-        subtitle: parsed.subtitle || defaultSubtitle,
-        content: parsed.content || defaultContent
-      };
+function broadcastState(state) {
+  const nextState = normalizeState(state);
+  writeStoredState(nextState);
+  renderContent(nextState);
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: 'update', state: nextState }));
+  }
+
+  return nextState;
+}
+
+function scheduleStateBroadcast() {
+  window.clearTimeout(syncTimer);
+  syncTimer = window.setTimeout(() => {
+    broadcastState(collectEditorState());
+  }, 250);
+}
+
+function connectToSyncServer() {
+  if (socket || typeof WebSocket === 'undefined') {
+    return;
+  }
+
+  socket = new WebSocket(SYNC_URL);
+
+  socket.addEventListener('open', () => {
+    isSocketReady = true;
+    socket.send(JSON.stringify({ type: 'request-state' }));
+  });
+
+  socket.addEventListener('message', (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+      if (payload?.type === 'state' && payload.state) {
+        applyState(payload.state, { silent: true });
+      }
+    } catch (error) {
+      console.warn('Could not parse sync payload:', error);
     }
-  } catch (error) {
-    console.warn('Could not decode shared blog state from URL:', error);
-  }
+  });
 
-  return null;
-}
-
-function fromBase64(value) {
-  const binary = atob(value);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
+  socket.addEventListener('close', () => {
+    isSocketReady = false;
+    socket = null;
+  });
 }
 
 async function loadContentFromSource() {
-  const sharedState = decodeStateFromUrl();
-
-  if (sharedState) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sharedState));
-    return sharedState;
-  }
-
   const saved = localStorage.getItem(STORAGE_KEY);
 
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === 'object') {
-        return {
-          title: parsed.title || defaultTitle,
-          subtitle: parsed.subtitle || defaultSubtitle,
-          content: parsed.content || defaultContent
-        };
+        return normalizeState(parsed);
       }
     } catch (error) {
       console.warn('Could not parse saved blog state:', error);
@@ -199,37 +228,6 @@ function buildMarkdownContent(state) {
   return `---\ntitle: ${title}\nsubtitle: ${subtitle}\n---\n\n${content}\n`;
 }
 
-function toBase64(value) {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-
-  return btoa(binary);
-}
-
-async function saveContentToRemote(state) {
-  const markdownContent = buildMarkdownContent(state);
-  const shareUrl = new URL(window.location.href);
-  shareUrl.hash = `blog=${encodeStateForUrl(state)}`;
-  const fullUrl = shareUrl.toString();
-
-  window.history.replaceState({}, '', fullUrl);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(fullUrl);
-    } catch (error) {
-      console.warn('Could not copy the shareable URL to the clipboard:', error);
-    }
-  }
-
-  return { ok: true, mode: 'share', url: fullUrl, markdownContent };
-}
-
 function renderContent(state) {
   const currentState = state || getStoredState();
   blogTitle.textContent = currentState.title;
@@ -254,10 +252,8 @@ function renderContent(state) {
 
 async function loadContent() {
   const state = await loadContentFromSource();
-  titleInput.value = state.title;
-  subtitleInput.value = state.subtitle;
-  editorText.value = state.content;
-  renderContent(state);
+  applyState(state, { silent: true });
+  connectToSyncServer();
 }
 
 function downloadContentFile(text) {
@@ -305,29 +301,15 @@ editButton.addEventListener('click', () => {
   }
 });
 
-saveButton.addEventListener('click', async () => {
-  const state = {
-    title: titleInput.value.trim() || defaultTitle,
-    subtitle: subtitleInput.value.trim() || defaultSubtitle,
-    content: editorText.value.trim() || defaultContent
-  };
+saveButton.addEventListener('click', () => {
+  const state = broadcastState(collectEditorState());
+  renderContent(state);
+  editorPanel.classList.add('hidden');
 
-  try {
-    const remoteResult = await saveContentToRemote(state);
-    renderContent(state);
-    editorPanel.classList.add('hidden');
-
-    if (remoteResult?.url) {
-      window.alert(`Blog saved globally. Share this link to reopen it anywhere:\n${remoteResult.url}`);
-    } else {
-      window.alert('Blog saved locally.');
-    }
-  } catch (error) {
-    console.error('Could not save the blog remotely:', error);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    renderContent(state);
-    editorPanel.classList.add('hidden');
-    window.alert('Blog saved locally, but the remote sync failed.');
+  if (isSocketReady) {
+    window.alert('Blog synced to connected devices.');
+  } else {
+    window.alert('Saved locally. Open the same server on another device to sync.');
   }
 });
 
@@ -340,8 +322,27 @@ cancelButton.addEventListener('click', () => {
   editorPanel.classList.add('hidden');
 });
 
+titleInput.addEventListener('input', () => {
+  renderContent(collectEditorState());
+  scheduleStateBroadcast();
+});
+
+subtitleInput.addEventListener('input', () => {
+  renderContent(collectEditorState());
+  scheduleStateBroadcast();
+});
+
+editorText.addEventListener('input', () => {
+  renderContent(collectEditorState());
+  scheduleStateBroadcast();
+});
+
 toolbarButtons.forEach((button) => {
-  button.addEventListener('click', () => insertMarkdownTag(button.dataset.insert));
+  button.addEventListener('click', () => {
+    insertMarkdownTag(button.dataset.insert);
+    renderContent(collectEditorState());
+    scheduleStateBroadcast();
+  });
 });
 
 window.addEventListener('DOMContentLoaded', () => {

@@ -1,0 +1,25 @@
+{
+  "name": "personal-blog",
+  "version": "1.0.0",
+  "description": "Bu proje statik bir blog sitesidir. GitHub Pages üzerinden yayınlamak için hazırdır.",
+  "main": "config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EfeKaner/personal-blog.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/EfeKaner/personal-blog/issues"
+  },
+  "homepage": "https://github.com/EfeKaner/personal-blog#readme",
+  "dependencies": {
+    "ws": "^8.21.0"
+  }
+}
