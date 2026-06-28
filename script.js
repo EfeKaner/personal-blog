@@ -141,6 +141,10 @@ function broadcastState(state) {
   writeStoredState(nextState);
   renderContent(nextState);
 
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    connectToSyncServer();
+  }
+
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: 'update', state: nextState }));
   }
@@ -305,12 +309,7 @@ saveButton.addEventListener('click', () => {
   const state = broadcastState(collectEditorState());
   renderContent(state);
   editorPanel.classList.add('hidden');
-
-  if (isSocketReady) {
-    window.alert('Blog synced to connected devices.');
-  } else {
-    window.alert('Saved locally. Open the same server on another device to sync.');
-  }
+  window.alert('Saved globally.');
 });
 
 downloadButton.addEventListener('click', () => {

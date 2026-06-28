@@ -5,8 +5,32 @@ const WebSocket = require('ws');
 
 const rootDir = __dirname;
 const port = process.env.PORT || 3000;
+const stateFilePath = path.join(rootDir, 'blog-state.json');
 const clients = new Set();
 let latestState = null;
+
+function readStoredState() {
+  try {
+    if (fs.existsSync(stateFilePath)) {
+      const raw = fs.readFileSync(stateFilePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        latestState = parsed;
+      }
+    }
+  } catch (error) {
+    console.warn('Could not read saved state file:', error);
+  }
+}
+
+function writeStoredState(state) {
+  try {
+    fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2));
+    latestState = state;
+  } catch (error) {
+    console.warn('Could not write saved state file:', error);
+  }
+}
 
 function serveFile(filePath, response) {
   const resolvedPath = path.join(rootDir, filePath);
@@ -30,6 +54,8 @@ function serveFile(filePath, response) {
     response.end(content);
   });
 }
+
+readStoredState();
 
 const server = http.createServer((req, res) => {
   const requestPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
@@ -57,7 +83,7 @@ wss.on('connection', (socket) => {
       const payload = JSON.parse(rawMessage.toString());
 
       if (payload?.type === 'update' && payload.state) {
-        latestState = payload.state;
+        writeStoredState(payload.state);
         const message = JSON.stringify({ type: 'state', state: latestState });
         clients.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
@@ -81,6 +107,6 @@ wss.on('connection', (socket) => {
   });
 });
 
-server.listen(port, () => {
-  console.log(`Blog sync server running on http://localhost:${port}`);
+server.listen(port, '0.0.0.0', () => {
+  console.log(`Blog sync server running on http://0.0.0.0:${port}`);
 });
