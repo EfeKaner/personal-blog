@@ -107,7 +107,68 @@ function parseContentText(text) {
   return { title, subtitle, content };
 }
 
+function encodeStateForUrl(state) {
+  const json = JSON.stringify(state);
+  return encodeURIComponent(toBase64(json));
+}
+
+function decodeStateFromUrl() {
+  const hash = window.location.hash.replace(/^#/, '');
+  const stateMatch = hash.match(/^blog=(.+)$/);
+
+  if (!stateMatch) {
+    return null;
+  }
+
+  try {
+    const decoded = fromBase64(decodeURIComponent(stateMatch[1]));
+    const parsed = JSON.parse(decoded);
+
+    if (parsed && typeof parsed === 'object') {
+      return {
+        title: parsed.title || defaultTitle,
+        subtitle: parsed.subtitle || defaultSubtitle,
+        content: parsed.content || defaultContent
+      };
+    }
+  } catch (error) {
+    console.warn('Could not decode shared blog state from URL:', error);
+  }
+
+  return null;
+}
+
+function fromBase64(value) {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
 async function loadContentFromSource() {
+  const sharedState = decodeStateFromUrl();
+
+  if (sharedState) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sharedState));
+    return sharedState;
+  }
+
+  const saved = localStorage.getItem(STORAGE_KEY);
+
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          title: parsed.title || defaultTitle,
+          subtitle: parsed.subtitle || defaultSubtitle,
+          content: parsed.content || defaultContent
+        };
+      }
+    } catch (error) {
+      console.warn('Could not parse saved blog state:', error);
+    }
+  }
+
   for (const url of CONTENT_URLS) {
     try {
       const response = await fetch(url, { cache: 'no-store' });
@@ -150,42 +211,23 @@ function toBase64(value) {
 }
 
 async function saveContentToRemote(state) {
-  if (!GITHUB_TOKEN || !REPOSITORY) {
-    return false;
-  }
-
-  const endpoint = `https://api.github.com/repos/${REPOSITORY}/contents/blog-content.md`;
-  const headers = {
-    Accept: 'application/vnd.github+json',
-    Authorization: `Bearer ${GITHUB_TOKEN}`,
-    'X-GitHub-Api-Version': '2022-11-28',
-    'Content-Type': 'application/json'
-  };
-
-  const getResponse = await fetch(endpoint, { headers });
-
-  if (!getResponse.ok) {
-    throw new Error(`Unable to read blog file from GitHub: ${getResponse.status}`);
-  }
-
-  const fileData = await getResponse.json();
   const markdownContent = buildMarkdownContent(state);
-  const putResponse = await fetch(endpoint, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify({
-      message: 'Update blog content',
-      content: toBase64(markdownContent),
-      sha: fileData.sha
-    })
-  });
+  const shareUrl = new URL(window.location.href);
+  shareUrl.hash = `blog=${encodeStateForUrl(state)}`;
+  const fullUrl = shareUrl.toString();
 
-  if (!putResponse.ok) {
-    const errorText = await putResponse.text();
-    throw new Error(`Unable to save blog file to GitHub: ${putResponse.status} ${errorText}`);
+  window.history.replaceState({}, '', fullUrl);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+    } catch (error) {
+      console.warn('Could not copy the shareable URL to the clipboard:', error);
+    }
   }
 
-  return true;
+  return { ok: true, mode: 'share', url: fullUrl, markdownContent };
 }
 
 function renderContent(state) {
@@ -271,15 +313,14 @@ saveButton.addEventListener('click', async () => {
   };
 
   try {
-    const remoteSaved = await saveContentToRemote(state);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const remoteResult = await saveContentToRemote(state);
     renderContent(state);
     editorPanel.classList.add('hidden');
 
-    if (remoteSaved) {
-      window.alert('Blog saved successfully to the shared content file.');
+    if (remoteResult?.url) {
+      window.alert(`Blog saved globally. Share this link to reopen it anywhere:\n${remoteResult.url}`);
     } else {
-      window.alert('Blog saved locally. Add a GitHub token to sync it to the repository.');
+      window.alert('Blog saved locally.');
     }
   } catch (error) {
     console.error('Could not save the blog remotely:', error);
