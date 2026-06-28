@@ -4,7 +4,7 @@
   "description": "Bu proje statik bir blog sitesidir. GitHub Pages üzerinden yayınlamak için hazırdır.",
   "main": "config.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test",
     "start": "node server.js"
   },
   "repository": {

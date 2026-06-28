@@ -1,10 +1,10 @@
 ---
-title: Test Blog Update
-subtitle: By Efe · Updated for everyone
+title: Second Test Blog Update
+subtitle: By Efe · Updated again for everyone
 ---
 
-This is a test update for everyone.
+This is a second test update for everyone.
 
-The blog content is now shared publicly.
+The shared blog content should now show this latest message.
 
-If you can see this message, the change is working.
+If you can see this version, the update is working.

@@ -17,6 +17,27 @@
           <h1 class="blog-title">Welcome to my quiet corner of the web</h1>
           <p class="blog-meta">By Efe · Updated recently</p>
           <div id="blogContent" class="blog-content"></div>
+
+          <section class="comments-section" aria-label="Comments">
+            <div class="comments-section__header">
+              <h2>Comments</h2>
+              <p>Share a thought or reply to someone else’s note.</p>
+            </div>
+
+            <form id="commentForm" class="comment-form">
+              <label class="comment-field">
+                <span>Name</span>
+                <input id="commentAuthor" name="author" type="text" maxlength="40" placeholder="Your name" />
+              </label>
+              <label class="comment-field comment-field--grow">
+                <span>Comment</span>
+                <textarea id="commentText" name="text" rows="4" placeholder="Write something kind..."></textarea>
+              </label>
+              <button class="primary" type="submit">Post comment</button>
+            </form>
+
+            <div id="commentList" class="comment-thread"></div>
+          </section>
         </div>
       </section>
     </main>

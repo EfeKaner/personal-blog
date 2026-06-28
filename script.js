@@ -1,4 +1,8 @@
 const STORAGE_KEY = 'personal-blog-content';
+const COMMENT_FORM_ID = 'commentForm';
+const COMMENT_AUTHOR_ID = 'commentAuthor';
+const COMMENT_TEXT_ID = 'commentText';
+const COMMENT_LIST_ID = 'commentList';
 const CONTENT_URLS = [
   'https://raw.githubusercontent.com/EfeKaner/personal-blog/main/blog-content.md',
   new URL('blog-content.md', window.location.href).href
@@ -21,6 +25,10 @@ const defaultState = {
 
 const blogContent = document.getElementById('blogContent');
 const editButton = document.getElementById('editButton');
+const commentForm = document.getElementById(COMMENT_FORM_ID);
+const commentAuthor = document.getElementById(COMMENT_AUTHOR_ID);
+const commentText = document.getElementById(COMMENT_TEXT_ID);
+const commentList = document.getElementById(COMMENT_LIST_ID);
 const editorPanel = document.getElementById('editorPanel');
 const editorText = document.getElementById('editorText');
 const titleInput = document.getElementById('titleInput');
@@ -51,12 +59,77 @@ function escapeHtml(value) {
 
 function normalizeState(state) {
   const baseState = state && typeof state === 'object' ? state : {};
+  const comments = Array.isArray(baseState.comments) ? baseState.comments : [];
 
   return {
     title: (baseState.title || defaultTitle).toString().trim() || defaultTitle,
     subtitle: (baseState.subtitle || defaultSubtitle).toString().trim() || defaultSubtitle,
-    content: (baseState.content || defaultContent).toString().trim() || defaultContent
+    content: (baseState.content || defaultContent).toString().trim() || defaultContent,
+    comments: comments.map((comment) => normalizeComment(comment))
   };
+}
+
+function normalizeComment(comment) {
+  const baseComment = comment && typeof comment === 'object' ? comment : {};
+  const replies = Array.isArray(baseComment.replies) ? baseComment.replies : [];
+
+  return {
+    id: baseComment.id || `comment-${Math.random().toString(36).slice(2, 10)}`,
+    author: (baseComment.author || 'Anonymous').toString().trim() || 'Anonymous',
+    text: (baseComment.text || '').toString().trim(),
+    createdAt: baseComment.createdAt || new Date().toISOString(),
+    replies: replies.map((reply) => normalizeComment(reply))
+  };
+}
+
+function addCommentToState(state, input) {
+  const nextState = normalizeState(state);
+  const text = (input?.text || '').toString().trim();
+  const author = (input?.author || 'Anonymous').toString().trim() || 'Anonymous';
+
+  if (!text) {
+    return nextState;
+  }
+
+  const newComment = {
+    id: `comment-${Math.random().toString(36).slice(2, 10)}`,
+    author,
+    text,
+    createdAt: new Date().toISOString(),
+    replies: []
+  };
+
+  if (input?.parentId) {
+    const target = findCommentById(nextState.comments, input.parentId);
+    if (target) {
+      target.replies.push(newComment);
+      return nextState;
+    }
+  }
+
+  nextState.comments.push(newComment);
+  return nextState;
+}
+
+function clearCommentsFromState(state) {
+  const nextState = normalizeState(state);
+  nextState.comments = [];
+  return nextState;
+}
+
+function findCommentById(comments, id) {
+  for (const comment of comments) {
+    if (comment.id === id) {
+      return comment;
+    }
+
+    const nested = findCommentById(comment.replies || [], id);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
 }
 
 function getStoredState() {
@@ -240,6 +313,40 @@ function buildMarkdownContent(state) {
   return `---\ntitle: ${title}\nsubtitle: ${subtitle}\n---\n\n${content}\n`;
 }
 
+function renderComments(state) {
+  const currentState = state || getStoredState();
+  const comments = Array.isArray(currentState.comments) ? currentState.comments : [];
+
+  if (!commentList) {
+    return;
+  }
+
+  if (!comments.length) {
+    commentList.innerHTML = '<p class="comment-empty">No comments yet. Start the conversation.</p>';
+    return;
+  }
+
+  commentList.innerHTML = comments.map((comment) => renderComment(comment)).join('');
+}
+
+function renderComment(comment, depth = 0) {
+  const indent = depth > 0 ? 'comment-thread__item--nested' : '';
+  const replyButton = `<button type="button" class="comment-reply-button" data-parent-id="${comment.id}">Reply</button>`;
+  const repliesMarkup = (comment.replies || []).map((reply) => renderComment(reply, depth + 1)).join('');
+
+  return `
+    <article class="comment-thread__item ${indent}">
+      <div class="comment-thread__meta">
+        <strong>${escapeHtml(comment.author)}</strong>
+        <span>${escapeHtml(new Date(comment.createdAt).toLocaleString())}</span>
+      </div>
+      <p>${escapeHtml(comment.text)}</p>
+      <div class="comment-thread__actions">${replyButton}</div>
+      ${repliesMarkup ? `<div class="comment-thread__replies">${repliesMarkup}</div>` : ''}
+    </article>
+  `;
+}
+
 function renderContent(state) {
   const currentState = state || getStoredState();
   blogTitle.textContent = currentState.title;
@@ -260,6 +367,7 @@ function renderContent(state) {
     .join('');
 
   blogContent.innerHTML = paragraphs;
+  renderComments(currentState);
 }
 
 async function loadContent() {
@@ -314,8 +422,12 @@ editButton.addEventListener('click', () => {
 });
 
 saveButton.addEventListener('click', () => {
-  const state = broadcastState(collectEditorState());
-  renderContent(state);
+  const currentState = getStoredState();
+  const nextState = broadcastState({
+    ...collectEditorState(),
+    comments: clearCommentsFromState(currentState).comments
+  });
+  renderContent(nextState);
   editorPanel.classList.add('hidden');
   window.alert('Saved globally.');
 });
@@ -351,6 +463,51 @@ toolbarButtons.forEach((button) => {
     scheduleStateBroadcast();
   });
 });
+
+if (commentForm) {
+  commentForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const currentState = getStoredState();
+    const authorValue = commentAuthor?.value?.trim() || 'Anonymous';
+    const textValue = commentText?.value?.trim() || '';
+    const parentId = commentForm.dataset.parentId || '';
+
+    const nextState = addCommentToState(currentState, {
+      author: authorValue,
+      text: textValue,
+      parentId: parentId || undefined
+    });
+
+    writeStoredState(nextState);
+    renderContent(nextState);
+
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'update', state: nextState }));
+    }
+
+    commentForm.reset();
+    commentForm.removeAttribute('data-parent-id');
+    commentText?.focus();
+  });
+}
+
+if (commentList) {
+  commentList.addEventListener('click', (event) => {
+    const replyButton = event.target.closest('.comment-reply-button');
+    if (!replyButton) {
+      return;
+    }
+
+    const parentId = replyButton.dataset.parentId;
+    if (parentId) {
+      commentForm.dataset.parentId = parentId;
+      commentText?.focus();
+      commentText.value = '';
+      commentAuthor?.focus();
+    }
+  });
+}
 
 window.addEventListener('DOMContentLoaded', () => {
   loadContent();
