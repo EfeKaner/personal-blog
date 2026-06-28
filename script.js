@@ -35,7 +35,10 @@ const toolbarButtons = document.querySelectorAll('.chip-button');
 let socket = null;
 let syncTimer = null;
 let isSocketReady = false;
-const SYNC_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}/ws`;
+const syncUrlConfig = window.__BLOG_CONFIG__?.syncUrl;
+const SYNC_URL = typeof syncUrlConfig === 'string' && syncUrlConfig.trim()
+  ? syncUrlConfig.trim()
+  : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
 
 function escapeHtml(value) {
   return value
@@ -185,6 +188,11 @@ function connectToSyncServer() {
   socket.addEventListener('close', () => {
     isSocketReady = false;
     socket = null;
+    window.setTimeout(() => {
+      if (!socket) {
+        connectToSyncServer();
+      }
+    }, 1000);
   });
 }
 
